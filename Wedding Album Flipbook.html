@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shekhar and Ankita — Wedding Slideshow</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6efe6;--fg:#3b2f2a;--gold:#b08d57;--bar:rgba(255,255,255,.7);--sh:rgba(60,40,20,.35);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1816;--fg:#efe4d3;--bar:rgba(40,34,30,.8);--sh:rgba(0,0,0,.7)}}
+:root[data-theme="dark"]{--bg:#1c1816;--fg:#efe4d3;--bar:rgba(40,34,30,.8);--sh:rgba(0,0,0,.7)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:'Cormorant Garamond',Georgia,serif;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+header{text-align:center;padding:12px 12px 0}
+h1{margin:0;font-weight:600;font-size:clamp(20px,3.2vw,38px);letter-spacing:.08em;color:var(--gold)}
+h1 small{display:block;font-size:.4em;letter-spacing:.35em;color:var(--fg);opacity:.7;font-weight:400}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#111;overflow:hidden}
+.slide-image{position:absolute;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0;transform:scale(1.015);transition:opacity .75s ease,transform .75s ease}
+.slide-image.active{opacity:1;transform:scale(1)}
+header{position:fixed;z-index:2;top:0;left:0;right:0;padding:clamp(14px,3vw,28px) 12px 18px;background:linear-gradient(rgba(0,0,0,.58),transparent);color:#fff}
+h1{color:#fff;text-shadow:0 1px 8px #000}
+h1 small{color:#fff}
+nav{position:fixed;z-index:2;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:10px;padding:22px 12px max(18px,env(safe-area-inset-bottom));flex-wrap:wrap;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff}
+button,label.btn{font:inherit;font-size:18px;color:#fff;background:rgba(25,22,20,.76);border:1px solid var(--gold);border-radius:999px;padding:7px 18px;cursor:pointer;min-height:42px;display:inline-flex;align-items:center;justify-content:center}
+button:hover,label.btn:hover{background:var(--gold);color:#fff}
+button:focus-visible,label.btn:focus-visible{outline:2px solid #fff;outline-offset:3px}
+#count{min-width:88px;text-align:center;font-size:18px;letter-spacing:.05em}
+#message{position:fixed;z-index:2;bottom:92px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);padding:6px 12px;border-radius:12px;background:rgba(0,0,0,.68);color:#fff;text-align:center}
+#message:empty{display:none}
+audio{display:none}
+@media (max-width:520px){nav{gap:7px;padding-left:8px;padding-right:8px}button,label.btn{padding:6px 12px;font-size:16px}#count{min-width:100%;order:-1}}
+</style>
+</head>
+<body>
+<header><h1>Shekhar And Ankita Wedding Album<small>A STORY OF TWO HEARTS</small></h1></header>
+<main id="stage" aria-label="Wedding photo slideshow">
+  <img id="slide-a" class="slide-image" alt="Wedding album photo">
+  <img id="slide-b" class="slide-image" alt="Wedding album photo">
+</main>
+<div id="message" role="status" aria-live="polite"></div>
+<nav>
+  <button id="prev" title="Previous photo" aria-label="Previous photo">‹ Prev</button>
+  <button id="play" title="Start slideshow">▶ Slideshow</button>
+  <span id="count"></span>
+  <button id="next" title="Next photo" aria-label="Next photo">Next ›</button>
+  <button id="music-toggle" title="Play or pause music" aria-pressed="false">♫ Music off</button>
+  <label class="btn" title="Choose background music">Choose Music<input id="music-file" type="file" accept="audio/*" hidden></label>
+  <label class="btn" title="Load your own photos">Load Photos<input id="up" type="file" accept="image/*" multiple hidden></label>
+  <button id="fs" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
+</nav>
+<audio id="music" loop></audio>
+<script>
+const $ = id => document.getElementById(id);
+const slideA = $('slide-a'), slideB = $('slide-b'), music = $('music');
+let activeSlide = slideA, incomingSlide = slideB;
+let images = Array.from({length:47}, (_,i)=>`slides/${String(i+1).padStart(2,'0')}.jpg`);
+let index = 0, timer = null, loadId = 0, transitionTimer = null;
+let musicUrl = '', musicEnabled = true, uploadedImageUrls = [];
+
+function message(text){ $('message').textContent = text; }
+
+function updateCount(){ $('count').textContent = `Photo ${index+1} / ${images.length}`; }
+
+function showSlide(target){
+  if(!images.length) return;
+  index = (target + images.length) % images.length;
+  updateCount();
+  const currentLoad = ++loadId;
+  clearTimeout(transitionTimer);
+  incomingSlide.onload = () => {
+    if(currentLoad !== loadId) return;
+    incomingSlide.classList.add('active');
+    activeSlide.classList.remove('active');
+    const previous = activeSlide;
+    activeSlide = incomingSlide;
+    incomingSlide = previous;
+    incomingSlide.onload = null;
+    incomingSlide.onerror = null;
+    transitionTimer = setTimeout(() => incomingSlide.removeAttribute('src'), 800);
+  };
+  incomingSlide.onerror = () => {
+    if(currentLoad === loadId) message(`Could not load photo ${index+1}. Check that the image file is available.`);
+  };
+  incomingSlide.src = images[index];
+}
+
+function setImages(list){
+  if(!list.length) return;
+  clearInterval(timer);
+  timer = null;
+  $('play').textContent = '▶ Slideshow';
+  uploadedImageUrls.forEach(URL.revokeObjectURL);
+  uploadedImageUrls = list.filter(file => file instanceof File).map(file => URL.createObjectURL(file));
+  images = list.map(item => item instanceof File ? uploadedImageUrls.shift() : item);
+  uploadedImageUrls = images.filter(url => url.startsWith('blob:'));
+  index = 0;
+  message('');
+  showSlide(index);
+}
+
+function toggleSlideshow(){
+  if(timer){
+    clearInterval(timer);
+    timer = null;
+    $('play').textContent = '▶ Slideshow';
+    if(!music.paused) music.pause();
+    message('Slideshow paused.');
+    return;
+  }
+  timer = setInterval(() => showSlide(index+1), 5000);
+  $('play').textContent = 'Ⅱ Pause';
+  message('Slideshow playing · photos change every 5 seconds.');
+  if(music.src && musicEnabled) playMusic();
+}
+
+async function playMusic(){
+  try{
+    await music.play();
+    $('music-toggle').textContent = '♫ Music on';
+    $('music-toggle').setAttribute('aria-pressed','true');
+    message(`Playing music: ${music.dataset.name}`);
+  }catch(error){
+    $('music-toggle').textContent = '♫ Music off';
+    $('music-toggle').setAttribute('aria-pressed','false');
+    message(`Could not play the selected music: ${error.message}`);
+  }
+}
+
+$('next').onclick = () => showSlide(index+1);
+$('prev').onclick = () => showSlide(index-1);
+$('play').onclick = toggleSlideshow;
+$('music-toggle').onclick = () => {
+  if(!music.src){ message('Choose a music file first.'); return; }
+  if(music.paused){ musicEnabled = true; playMusic(); }
+  else{
+    musicEnabled = false;
+    music.pause();
+    $('music-toggle').textContent = '♫ Music off';
+    $('music-toggle').setAttribute('aria-pressed','false');
+    message('Music paused.');
+  }
+};
+$('fs').onclick = async () => {
+  try{
+    if(document.fullscreenElement) await document.exitFullscreen();
+    else if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+    else message('Fullscreen is not supported in this browser.');
+  }catch(error){
+    message(`Could not change fullscreen mode: ${error.message}`);
+  }
+};
+$('music-file').onchange = async event => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  if(musicUrl) URL.revokeObjectURL(musicUrl);
+  musicUrl = URL.createObjectURL(file);
+  music.src = musicUrl;
+  music.dataset.name = file.name;
+  musicEnabled = true;
+  await playMusic();
+};
+$('up').onchange = event => {
+  const files = [...event.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  event.target.value = '';
+  if(files.length) setImages(files);
+};
+music.onerror = () => message('The selected music file could not be loaded. Choose a supported audio file.');
+document.addEventListener('keydown', event => {
+  if(event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement ||
+     (event.target instanceof HTMLElement && event.target.closest('label'))) return;
+  if(event.key === 'ArrowRight' || event.key === 'PageDown') showSlide(index+1);
+  if(event.key === 'ArrowLeft' || event.key === 'PageUp') showSlide(index-1);
+  if(event.code === 'Space'){ event.preventDefault(); toggleSlideshow(); }
+});
+window.addEventListener('beforeunload', () => {
+  [...uploadedImageUrls, musicUrl].filter(Boolean).forEach(URL.revokeObjectURL);
+});
+updateCount();
+showSlide(index);
+</script>
+</body>
+</html>
