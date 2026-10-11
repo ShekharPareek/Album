@@ -78,7 +78,7 @@ function showSlide(target){
     incomingSlide = previous;
     incomingSlide.onload = null;
     incomingSlide.onerror = null;
-    transitionTimer = setTimeout(() => incomingSlide.removeAttribute('src'), 800);
+    transitionTimer = setTimeout(() => incomingSlide.removeAttribute('src'), 1500);
   };
   incomingSlide.onerror = () => {
     if(currentLoad === loadId) message(`Could not load photo ${index+1}. Check that the image file is available.`);
@@ -109,9 +109,9 @@ function toggleSlideshow(){
     message('Slideshow paused.');
     return;
   }
-  timer = setInterval(() => showSlide(index+1), 5000);
+  timer = setInterval(() => showSlide(index+1), 15000);
   $('play').textContent = 'Ⅱ Pause';
-  message('Slideshow playing · photos change every 5 seconds.');
+  message('Slideshow playing · photos change every 15 seconds.');
   if(music.src && musicEnabled) playMusic();
 }
 
