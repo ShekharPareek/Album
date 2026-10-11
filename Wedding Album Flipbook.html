@@ -19,6 +19,13 @@ h1 small{display:block;font-size:.4em;letter-spacing:.35em;color:var(--fg);opaci
 #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#111;overflow:hidden}
 .slide-image{position:absolute;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0;transform:scale(1.015);transition:opacity .75s ease,transform .75s ease}
 .slide-image.active{opacity:1;transform:scale(1)}
+.thank-you{position:relative;z-index:1;width:min(86vw,760px);padding:clamp(36px,9vw,88px) 24px;text-align:center;color:#fff;opacity:0;transform:scale(.97);transition:opacity .75s ease,transform .75s ease}
+.thank-you.active{opacity:1;transform:scale(1)}
+.thank-you::before{content:"";position:absolute;inset:12px;border:1px solid rgba(220,190,137,.78);pointer-events:none}
+.thank-you .eyebrow{margin:0 0 12px;color:#e4c994;font-size:clamp(12px,2vw,17px);letter-spacing:.38em;text-transform:uppercase}
+.thank-you h2{margin:0;font-weight:400;font-size:clamp(56px,12vw,112px);line-height:1.05}
+.thank-you .names{margin:20px 0 0;font-size:clamp(20px,4vw,34px);letter-spacing:.12em}
+.thank-you .closing{margin:10px 0 0;color:rgba(255,255,255,.78);font-size:clamp(16px,2.6vw,22px);letter-spacing:.12em}
 header{position:fixed;z-index:2;top:0;left:0;right:0;padding:clamp(14px,3vw,28px) 12px 18px;background:linear-gradient(rgba(0,0,0,.58),transparent);color:#fff}
 h1{color:#fff;text-shadow:0 1px 8px #000}
 h1 small{color:#fff}
@@ -38,6 +45,12 @@ audio{display:none}
 <main id="stage" aria-label="Wedding photo slideshow">
   <img id="slide-a" class="slide-image" alt="Wedding album photo">
   <img id="slide-b" class="slide-image" alt="Wedding album photo">
+  <section id="thank-you" class="thank-you" aria-label="Thank you for celebrating with us" aria-hidden="true">
+    <p class="eyebrow">A story of two hearts</p>
+    <h2>Thank You</h2>
+    <p class="names">SHEKHAR &amp; ANKITA</p>
+    <p class="closing">For being part of our special day</p>
+  </section>
 </main>
 <div id="message" role="status" aria-live="polite"></div>
 <nav>
@@ -45,30 +58,57 @@ audio{display:none}
   <button id="play" title="Start slideshow">▶ Slideshow</button>
   <span id="count"></span>
   <button id="next" title="Next photo" aria-label="Next photo">Next ›</button>
-  <button id="music-toggle" title="Play or pause music" aria-pressed="false">♫ Music off</button>
-  <label class="btn" title="Choose background music">Choose Music<input id="music-file" type="file" accept="audio/*" hidden></label>
-  <label class="btn" title="Load your own photos">Load Photos<input id="up" type="file" accept="image/*" multiple hidden></label>
+  <button id="music-toggle" title="Play or pause music" aria-pressed="false">♫ Play Music</button>
   <button id="fs" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
 </nav>
-<audio id="music" src="Kudmayi%20(Film%20Version)%20(From%20_Rocky%20Aur%20Rani%20Kii%20Prem%20Kahaani_).mp3" data-name="Kudmayi (Film Version)" preload="none" loop></audio>
+<audio id="music" src="Kudmayi%20(Film%20Version)%20(From%20_Rocky%20Aur%20Rani%20Kii%20Prem%20Kahaani_).mp3" data-name="Kudmayi (Film Version)" preload="none"></audio>
 <script>
 const $ = id => document.getElementById(id);
-const slideA = $('slide-a'), slideB = $('slide-b'), music = $('music');
+const slideA = $('slide-a'), slideB = $('slide-b'), thankYou = $('thank-you'), music = $('music');
 let activeSlide = slideA, incomingSlide = slideB;
 let images = Array.from({length:47}, (_,i)=>`slides/${String(i+1).padStart(2,'0')}.jpg`);
 let index = 0, timer = null, loadId = 0, transitionTimer = null;
-let musicUrl = '', musicEnabled = true, uploadedImageUrls = [];
+let musicUrl = '', uploadedImageUrls = [];
 
 function message(text){ $('message').textContent = text; }
 
-function updateCount(){ $('count').textContent = `Photo ${index+1} / ${images.length}`; }
+function updateCount(){ $('count').textContent = index === images.length ? 'Thank You' : `Photo ${index+1} / ${images.length}`; }
+
+function pauseMusic(){
+  music.pause();
+  $('music-toggle').textContent = '♫ Play Music';
+  $('music-toggle').setAttribute('aria-pressed','false');
+}
 
 function showSlide(target){
   if(!images.length) return;
-  index = (target + images.length) % images.length;
+  index = Math.max(0, Math.min(images.length, target));
   updateCount();
   const currentLoad = ++loadId;
   clearTimeout(transitionTimer);
+  if(index === images.length){
+    incomingSlide.onload = null;
+    incomingSlide.onerror = null;
+    activeSlide.classList.remove('active');
+    thankYou.classList.add('active');
+    thankYou.setAttribute('aria-hidden','false');
+    transitionTimer = setTimeout(() => {
+      activeSlide.removeAttribute('src');
+      incomingSlide.removeAttribute('src');
+    }, 800);
+    if(timer){
+      clearInterval(timer);
+      timer = null;
+    }
+    $('play').textContent = '▶ Replay Slideshow';
+    pauseMusic();
+    music.currentTime = 0;
+    message('Thank you for being part of our special day.');
+    return;
+  }
+  thankYou.classList.remove('active');
+  thankYou.setAttribute('aria-hidden','true');
+  if(!timer) $('play').textContent = '▶ Slideshow';
   incomingSlide.onload = () => {
     if(currentLoad !== loadId) return;
     incomingSlide.classList.add('active');
@@ -88,6 +128,7 @@ function showSlide(target){
 
 function setImages(list){
   if(!list.length) return;
+  if(timer) pauseMusic();
   clearInterval(timer);
   timer = null;
   $('play').textContent = '▶ Slideshow';
@@ -105,24 +146,25 @@ function toggleSlideshow(){
     clearInterval(timer);
     timer = null;
     $('play').textContent = '▶ Slideshow';
-    if(!music.paused) music.pause();
+    pauseMusic();
     message('Slideshow paused.');
     return;
   }
-  timer = setInterval(() => showSlide(index+1), 15000);
+  if(index === images.length) showSlide(0);
+  timer = setInterval(() => showSlide(index+1), 10000);
   $('play').textContent = 'Ⅱ Pause';
-  message('Slideshow playing · photos change every 15 seconds.');
-  if(music.src && musicEnabled) playMusic();
+  message('Slideshow playing · photos change every 10 seconds.');
+  if(music.src) playMusic();
 }
 
 async function playMusic(){
   try{
     await music.play();
-    $('music-toggle').textContent = '♫ Music on';
+    $('music-toggle').textContent = '♫ Pause Music';
     $('music-toggle').setAttribute('aria-pressed','true');
     message(`Playing music: ${music.dataset.name}`);
   }catch(error){
-    $('music-toggle').textContent = '♫ Music off';
+    $('music-toggle').textContent = '♫ Play Music';
     $('music-toggle').setAttribute('aria-pressed','false');
     message(`Could not play the selected music: ${error.message}`);
   }
@@ -133,11 +175,10 @@ $('prev').onclick = () => showSlide(index-1);
 $('play').onclick = toggleSlideshow;
 $('music-toggle').onclick = () => {
   if(!music.src){ message('Choose a music file first.'); return; }
-  if(music.paused){ musicEnabled = true; playMusic(); }
+  if(music.paused) playMusic();
   else{
-    musicEnabled = false;
     music.pause();
-    $('music-toggle').textContent = '♫ Music off';
+    $('music-toggle').textContent = '♫ Play Music';
     $('music-toggle').setAttribute('aria-pressed','false');
     message('Music paused.');
   }
@@ -151,16 +192,20 @@ $('fs').onclick = async () => {
     message(`Could not change fullscreen mode: ${error.message}`);
   }
 };
-$('music-file').onchange = async event => {
+$('music-file').onchange = event => {
   const file = event.target.files[0];
   event.target.value = '';
   if(!file) return;
   if(musicUrl) URL.revokeObjectURL(musicUrl);
+  music.pause();
+  music.currentTime = 0;
   musicUrl = URL.createObjectURL(file);
   music.src = musicUrl;
   music.dataset.name = file.name;
-  musicEnabled = true;
-  await playMusic();
+  $('music-toggle').textContent = '♫ Play Music';
+  $('music-toggle').setAttribute('aria-pressed','false');
+  if(timer) playMusic();
+  else message(`Music selected: ${file.name}. Start the slideshow to play it.`);
 };
 $('up').onchange = event => {
   const files = [...event.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
@@ -168,6 +213,11 @@ $('up').onchange = event => {
   if(files.length) setImages(files);
 };
 music.onerror = () => message('The selected music file could not be loaded. Choose a supported audio file.');
+music.onended = () => {
+  $('music-toggle').textContent = '♫ Play Music';
+  $('music-toggle').setAttribute('aria-pressed','false');
+  message('Music finished.');
+};
 document.addEventListener('keydown', event => {
   if(event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement ||
      (event.target instanceof HTMLElement && event.target.closest('label'))) return;
